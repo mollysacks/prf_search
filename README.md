@@ -4,6 +4,8 @@ This repository contains scripts that can be used to search through DNA sequence
 
 This pipeline was run on every annotated ORF in E. coli. If there was an intergenic region between one ORF and the next ORF, we added that region onto the 3' end of the first ORF. 
 
+Some large data files were not included in this repo due to their large size. The gammaproteobacteria database was found on NCBI refseq
+
 #Dependencies
 
 Rscape
