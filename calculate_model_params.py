@@ -117,7 +117,8 @@ def calc_structure_prior(freq):
 	print("Done calculating structure prior")
 	return structure_priors
 
-def codon_frequencies(fa):	 	
+def nuc_frequencies(fa):	
+	# calculate nucleotide frequencies 	
 	with open(fa) as f:
 		combined_fasta = f.read()
 	f.close()
@@ -140,6 +141,8 @@ def codon_frequencies(fa):
 	nucleotide_frequencies = {}
 	for nucleotide, count in nucleotides.items():
 		nucleotide_frequencies[nucleotide] = nucleotides[nucleotide] / sum(nucleotides.values())
+	
+	# calculate remaining parameters
 	structure_prior = calc_structure_prior(nucleotide_frequencies)
 	tildes = calculate_upstream_tildes(15, nucleotide_frequencies)
 	bit_score = {}
@@ -157,6 +160,7 @@ def codon_frequencies(fa):
 	params = {}
 	SS_t = {'A':0, 'C':0, 'G':0, 'T':0}
 	hexamers = all_sequences(6, nucleotide_frequencies, [''])
+	# calculate P(SS_t)
 	for seq in hexamers:
 	    if re.match(r'([ATCG])\1{1}([AT])\2{2}[ATCG]', seq):
 	        SS_t[seq[0]] += null(seq, nucleotide_frequencies)
@@ -177,5 +181,5 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-F', default=None, type=str, help='Path to fasta')
 	args = parser.parse_args()
-	params = codon_frequencies(args.F)
+	params = nuc_frequencies(args.F)
 	write_output(params)

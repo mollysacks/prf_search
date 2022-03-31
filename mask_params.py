@@ -2,6 +2,10 @@ import argparse
 import pandas as pd
 import re
 
+
+# This script parses hmmer alignments to figure out how many bases were trimmed by hmmer
+# Hmmer occasionally trims alignments without user specification
+
 def hamming_distance(s1, s2):
     return sum(c1 != c2 for c1, c2 in zip(s1, s2))
 

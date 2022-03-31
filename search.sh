@@ -39,7 +39,7 @@ root=$out$time_stamp
 python3 split_fa.py -F ${fa} -O ${root}
 wait
 
-python3 calculate_model_params.py -F /Users/mollysacks/thesis/prf-search/All-genes-of-E.-coli-K-12-substr.-MG1655.fasta
+python3 calculate_model_params.py -F All-genes-of-E.-coli-K-12-substr.-MG1655.fasta
 wait
 
 #count number of directories created
@@ -71,9 +71,11 @@ find_features () {
 					hmmbuild --fast --symfrac 0.0 -o ${seq}.iter3.hmm.txt ${seq}.iter3.hmm ${seq}.iter2.sto
 					nhmmer -A ${seq}.iter3.sto -o ${seq}.iter3.txt ${seq}.iter3.hmm ${db}
 					
+					# find number of bases that hmmer trimmed
 					t=`python3 mask_params.py -F ${seq} -S ${seq}.iter3.sto`
 					ti=$(($t +26 ))
 
+					# trim remaining bases
 					esl-alimask -t -o ${seq}.final.sto ${seq}.iter3.sto ${t}: > ${seq}.final.txt
 					esl-alimask -t -o ${seq}.structure.sto ${seq}.iter3.sto ${ti}: > ${seq}.structure.txt
 					esl-alistat --cinfo ${seq}.conservation ${seq}.final.sto > ${seq}.conservation.txt 
@@ -85,7 +87,7 @@ find_features () {
 					cp *.fold.sto ${path_to_prf_search}/${loc}
 					cd ..
 
-					# check for structure and look for other (optional) features
+					# generate report for this pattern match
 					python3 ${path_to_prf_search}/generate_loc_report.py \
 						-F *.fa \
 						-S *.fold.sto \
@@ -98,12 +100,8 @@ find_features () {
 						-Q ${path_to_prf_search}/frequencies \
 						-C *.conservation
 
-					# Get conservation info
-
 					cd ${path_to_prf_search}
 				else
-        			#echo "No hits satisfy inclusion thresholds; no alignment saved for ${loc}"
-        			#echo "Removing ${loc} from candidate PRF sites"
         			rm -R $loc
         			continue
      			fi
@@ -113,8 +111,9 @@ find_features () {
 }
 
 i="1"
-sss="0"
 
+# run nhmmer on hits in slippery sequence search
+# wait after every 5th hit so that we only have 5 nhmmer processes running at once
 for cDNA in ${root}/*
 do 
 	j=$(($i % 5))
@@ -130,8 +129,13 @@ do
 done
 wait
 
-python3 random_probability_eval.py -I ${fa}
+# run null model
+python3 random_probability_eval.py -F All-genes-of-E.-coli-K-12-substr.-MG1655.fasta
 
+# run null model on input fasta to catch any sequences that were not well conserved
+python3 random_probability_eval.py -I ${fa} -F All-genes-of-E.-coli-K-12-substr.-MG1655.fasta
+
+# create plots
 python3 create_plots.py -O ${root}.report.tsv -N null.tsv -C ${fa}.results.tsv
 
 

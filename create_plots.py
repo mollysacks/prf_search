@@ -14,6 +14,7 @@ def num_arresting_residues(string):
 	return n
 
 def colors(df):
+	# assign colors for plotting based on upstream distribution
 	cols = list([plt.cm.tab10(i) for i in range(10)]) 
 	categories = ['Neither', 'SD', 'NP2', 'NP3', 'NP4', 'NP5', 'SD_NP2', 'SD_NP3', 'SD_NP4', 'SD_NP5']
 	assignments = {}
@@ -24,9 +25,8 @@ def colors(df):
 	return df, assignments
 
 def merge(out_df, no_cacofold):
-	#2163 out
-	#2349
-	conserved = list(zip(out_df['cDNA'], out_df['Slippery Sequence Start (k)']))
+	# merge df of well conserved sites with other sites
+	conserved = list(zip(out_df['gene'], out_df['Slippery Sequence Start (k)']))
 	for i, row in no_cacofold.iterrows(): 
 		if (row['gene'], row['Slippery Sequence Start (k)']) not in conserved:
 			row['Structure'] = ''

@@ -41,6 +41,8 @@ def extract_conservation_info(loc_dict, cinfo):
 	total_cons = 0
 	sd_cons = 0
 	a = 0
+	# start at first base
+	# calc upstream conservation
 	while a <= k:
 		if (a >= i) and (a <= j):
 			sd_cons += records[a][seq[a]]
@@ -54,11 +56,13 @@ def extract_conservation_info(loc_dict, cinfo):
 	a -= 1
 	# subtract last iteration
 	total_cons -= records[a][seq[a]]
+	# calculate slippery conservation
 	while a <= l:
 		ss_cons += records[a][seq[a]]
 		total_cons += records[a][seq[a]]
 		a += 1
 	ss_cons /= 7
+	# calculate downstream conservation
 	while a < len(seq):
 		if a in records:
 			ds_cons += records[a][seq[a]]

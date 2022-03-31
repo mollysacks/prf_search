@@ -7,16 +7,6 @@ import numpy as np
 import math
 import RNA
 
-def to_Vienna(cacofold_struct):
-	s = cacofold_struct.replace("<", "(")
-	s = s.replace(">", ")")
-	s = s.replace("{", "(")
-	s = s.replace("}", "(")
-	s = s.replace("-", ".")
-	s = s.replace("_", ".")
-	s = s.replace(":", ".")
-	return s
-
 def to_RNA(dna):
 	rna = ""
 	for c in dna:
@@ -34,11 +24,13 @@ def null(seq, freq):
     return 2 ** (prob)
 
 def calc_upstream_prob(seq, freq, tildes, stars, arresting):
+	# calculate upstream probability
     F = upstream_subset(seq[0:15])
     prob = stars[F] * null(seq[0:15], freq) / tildes[F]
     return(prob)
 
 def upstream_subset(seq):
+	# parses upstream sequence for features
 	arresting = ['K', 'R', 'P']
 	if len(seq) != 15:
 		seq = seq[0:15]
@@ -58,22 +50,14 @@ def upstream_subset(seq):
 		return('Neither')
 
 def slippery_prob(seq, freq, ss):
+	# calculates slippery sequence probability
 	if seq[0] != seq[1]:
 		return null(seq[1:], freq) * (2 ** -6)
 	else:
 		return (null(seq[1:], freq)/ ss[seq[0]])
 
-def space_prob(l, m, seq, freq):
-	prob = null(seq[l+1:m], freq)
-	space = len(seq[l+1:m])
-	if (space > 4) and (space < 10):
-		len_prob = .1999
-	else:
-		n = space - 9
-		len_prob = .0005 * (2 ** -n)
-	return prob * len_prob
-
 def P_DS(sequence, freq, structure_priors, l, n, structure):
+	# Calculates probability of observing an RNA secondary structure taht could inhibit the ribosome in the downstream sequence
 	m_dist = list()
 	if len(structure) <= 10:
 		return(null(sequence[l+1:], freq) * (2 ** (-(len(sequence) - l + 1))))
@@ -83,7 +67,7 @@ def P_DS(sequence, freq, structure_priors, l, n, structure):
 			continue
 		if int(value) < min_marg:
 			min_marg = int(value)
-	for m in range(l+6,len(sequence)):
+	for m in range(l+6,len(sequence)): #start at 6th base after end of slippery sequence
 		space = len(sequence[l+1:m])
 		if (space > 4) and (space < 10):
 		    pm = .1999
@@ -97,13 +81,15 @@ def P_DS(sequence, freq, structure_priors, l, n, structure):
 			continue
 		a = RNA.fold_compound(seq)
 		subopts = list(a.subopt(100))
+		# if there are no structures, continue to next value of m
 		if len(subopts) == 0:
 			continue
 		for s in subopts:
 			if s.energy <= 0:
 				total_mfe += s.energy
-				if s.structure[0] == '(':
+				if s.structure[0] == '(': # check if there is structure that starts at base m
 					struct_mfe += s.energy
+		# if there are no MFE strctures, continue to next value of m
 		if total_mfe == 0:
 			continue
 		if struct_mfe == 0:
@@ -112,6 +98,7 @@ def P_DS(sequence, freq, structure_priors, l, n, structure):
 		prior = null(sequence[l+1:], freq)
 		marg = structure_priors[str(len(seq))]
 		if marg == 0:
+			# use minimum marginalization to avoid div/0
 			m_dist.append((pm, likelihood * prior/ min_marg))
 			continue
 		posterior = (likelihood*prior)/marg
@@ -157,7 +144,6 @@ def calc_probability(site_info, freqs, reference):
 
 	# calculate probabilities
 	upstream_prob = calc_upstream_prob(seq, nucleotide_freq, tildes, stars, ['R', 'P', 'K'])
-	#slip_prob = slippery_prob(seq[k:l+1], nucleotide_freq)
 	slip_prob = slippery_prob(seq[k:l+1], nucleotide_freq, ss)
 	struct_prob = P_DS(reference, nucleotide_freq, structure_marg, l, n, site_info['Structure'])	
 	lodd = {}

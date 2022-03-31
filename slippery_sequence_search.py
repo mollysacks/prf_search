@@ -4,15 +4,15 @@ import os
 import shutil
 import json
 
-def search(reference, length, min_struct_len, upstream_len, space, gene_length):
+def search(reference, length, upstream_len, space, gene_length):
 	# searches through sequence for slippery sequences
 	# outputs list of tuples with (loca, sequence + L bases)
 	segments = list() #initialize list of segments
-	i = 26 # start at last base of ninth codon
-	while (i <= gene_length): #len(reference) - 7): # go until last 7 bases
+	i = 26 # start at last base of ninth codon (to allow for extra space if hmmer trims alignment)
+	while (i <= gene_length): # go until end of gene
 		if re.match(r'([ATCG])\1{2}([AT])\2{2}[ATCG]', reference[i:i+7]): # check if slippery sequence
 			if len(reference) - i > length: # if there are > length bases left
-				new_seq = reference[i - (upstream_len + 12): i + space + length] # include an extra 12 bases in case hmmer cuts some off
+				new_seq = reference[i - (upstream_len + 12): i + space + length] # include an extra 12 bases upstream in case hmmer cuts some off
 			segments.append((i, new_seq))
 		i = i + 3 # go to next codon
 	return segments
@@ -30,7 +30,7 @@ def realign_newlines(seq):
 		i += 79
 	return new_seq
 
-def find_slippery_sequences(rootdir, length, min_struct_len, upstream_len, space):
+def find_slippery_sequences(rootdir, length, upstream_len, space):
 	# rootdir contains a directory for each cDNA sequence in input file
 	# Each of these folders contains a fasta w/ just that cDNA sequence
 	with open('gene_lengths_e_coli') as f:
@@ -47,13 +47,13 @@ def find_slippery_sequences(rootdir, length, min_struct_len, upstream_len, space
 			header = lines[0]
 			gene = header.split(':')[3]
 			sequence = ''.join(lines[1:])
-			if not re.match(r'.TG', sequence[0:3]):
+			if not re.match(r'.TG', sequence[0:3]): # make sure gene starts with start codon
 				continue
 			if gene not in glength:
 				glength[gene] = len(sequence)
-			segments = search(sequence, length, min_struct_len, upstream_len, space, glength[gene])
+			segments = search(sequence, length, upstream_len, space, glength[gene]) # find segments and loci
 			if segments == []:
-				shutil.rmtree(os.path.join(rootdir, directory))
+				shutil.rmtree(os.path.join(rootdir, directory)) # remove folder for gene if there are no matches
 			for loc, seq in segments:
 				# realign newlines to improve readability
 				seq = realign_newlines(seq)
@@ -66,9 +66,8 @@ def find_slippery_sequences(rootdir, length, min_struct_len, upstream_len, space
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-D', default=None, type=str, help='directory w cDNA folders')
+	parser.add_argument('-D', default=None, type=str, help='directory w genefolders')
 	parser.add_argument('-L', default=None, type=int, help='length of sequence after slippery to include in output')
-	parser.add_argument('-M', default=18, type=int, help='min length of downstream sequence to include in output')
 	parser.add_argument('-U', default=90, type=int, help='max length of upstream segment to search for SD and nascent polypeptide')
 	parser.add_argument('-B', default=12, type=int, help='distance between slippery start and potential downstream structure')
 	args = parser.parse_args()

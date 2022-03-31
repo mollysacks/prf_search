@@ -3,7 +3,7 @@ import os
 import datetime
 
 def split_fasta(input_fasta, output_folder):
-	# Splits fasta with cDNAs into folder for each gene
+	# Splits fasta with genes into folder for each gene
 	# Input: fasta with gene
 	# Output: directory with folders for each gene sequence
 	

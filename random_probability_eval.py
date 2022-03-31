@@ -9,6 +9,9 @@ import RNA
 import json
 from Bio.Seq import Seq
 
+# Generates random sequences and calculates LOD scores for those sequences. 
+# Can also be used to calculate LOD without CaCoFold.
+
 def null(seq, freq):
 	# Calculate null sequence probability
     prob = 0
@@ -17,6 +20,8 @@ def null(seq, freq):
     return 2 ** (prob)
 
 def generate_lengths(n, fasta):
+	# generate lengths for random sequences
+	# drawn from distribution of input fasta
 	with open(fasta, 'r') as f:
 		lines = f.read()
 	f.close()
@@ -38,6 +43,7 @@ def generate_lengths(n, fasta):
 	return rand_lengths
 
 def generate_random_genes(lengths, freq):
+	# generates random sequences that follow null base distribution
 	cdnas = {}
 	bases = []
 	weights = []
@@ -45,7 +51,6 @@ def generate_random_genes(lengths, freq):
 		bases.append(base)
 		weights.append(frequency)
 	i = 0
-	j = 0
 	for l in lengths:
 		rand_seq = ''.join(random.choices(bases, weights = weights, k=l))
 		cdnas[f'RandomGene{str(i)}'] = rand_seq
@@ -53,15 +58,16 @@ def generate_random_genes(lengths, freq):
 	return cdnas
 
 def slippery_sequence_search(genes, gene_lengths):
-	length = 91
+	# finds slippery sequences
+	length = 91 # include 91 bases downstream of slippery sequence start for LOD scoring
 	pattern_matches = []
 	for name, seq in genes.items():
 		if name in gene_lengths:
 			length = gene_lengths[name]
-		elif len(seq) < 4000:
+		elif len(seq) < 5000: # randomly generated genes are not likely to be this long. 
 			length = len(seq)
 		else:
-			length = 4000
+			length = 5000
 		segments = list() #initialize list of segments
 		i = 14 # start at last base of fifth codon
 		while (i <= length - 80): #len(reference) - 7): # go until last 11
@@ -75,6 +81,8 @@ def slippery_sequence_search(genes, gene_lengths):
 	return pattern_matches
 
 def vienna_best_structure(seq):
+	# finds the most thermodynamically stable secondary structure
+	# also records where it ends
 	SS, MFE = RNA.fold(seq)
 	n = 25
 	up = False
@@ -107,52 +115,60 @@ def P_DS(sequence, freq, structure_priors, l, n, structure):
 	if len(structure) <= 10:
 		return(null(sequence[l+1:], freq) * (2 ** (-(len(sequence) - l + 1))))
 	min_marg = 1
-	for value in structure_priors.values():
+	for value in structure_priors.values(): 
+		# find minimum marginalization 
 		if int(value) == 0:
 			continue
 		if int(value) < min_marg:
 			min_marg = int(value)
-	for m in range(l+6,len(sequence)):
+	for m in range(l+6,len(sequence)): # start at 6th base after end of slippery sequence
 		space = len(sequence[l+1:m])
+		# find space probability (P(m))
 		if (space > 4) and (space < 10):
 		    pm = .1999
 		else:
 		    s = space - 9
 		    pm = .0005 * (2 ** -s)
-		seq = sequence[m:]
+		seq = sequence[m:] # extract sequence for folding
 		total_mfe = 0
 		struct_mfe = 0
 		if len(seq) == 0:
 			continue
 		a = RNA.fold_compound(seq)
-		subopts = list(a.subopt(100))
+		subopts = list(a.subopt(100)) #list top 100 suboptimal structures
 		if len(subopts) == 0:
 			continue
 		for s in subopts:
 			if s.energy <= 0:
 				total_mfe += s.energy
-				if s.structure[0] == '(':
+				if s.structure[0] == '(': #check if structure starts at first base
 					struct_mfe += s.energy
+		# if there are no structures, continue to next value of m
 		if total_mfe == 0:
 			continue
 		if struct_mfe == 0:
 			continue
+
+		# calculate likelihood, prior, and marg for this value of m
 		likelihood = struct_mfe/total_mfe
 		prior = null(sequence[l+1:], freq)
 		marg = structure_priors[str(len(seq))]
 		if marg == 0:
+			# use minimum marginalization if marg is 0 to avoid div/0
 			m_dist.append((pm, likelihood * prior/ min_marg))
 			continue
 		posterior = (likelihood*prior)/marg
 		m_dist.append((pm, posterior))
+	# calculate P_DS over distribution of m
 	P_DS = 0
-	if len(m_dist) == 0:
+	if len(m_dist) == 0: # if no structure was found
 		return null(seq[l+1:], freq) * (2**(-len(sequence[l+1:])))
 	for Pm, DS_m in m_dist:
 	    P_DS += Pm * DS_m
 	return P_DS
 
 def prob_eval(pattern_matches, nucleotide_freq, tildes, stars, structure_marg, ss):
+	# calculate LOD score for all pattern matches
 	records = []
 	for match in pattern_matches:
 		lodd = {}
@@ -168,10 +184,13 @@ def prob_eval(pattern_matches, nucleotide_freq, tildes, stars, structure_marg, s
 			lodd['SD'] = True
 		else:
 			lodd['SD'] = False 
+		# calculate probabilities
 		upstream_prob = probability_eval.calc_upstream_prob(seq, nucleotide_freq, tildes, stars, ['R', 'P', 'K'])
 		slip_prob = probability_eval.slippery_prob(seq[14:21], nucleotide_freq, ss)
 		n, struct = vienna_best_structure(seq[26:])
 		struct_prob = P_DS(seq, nucleotide_freq, structure_marg, 20, n, struct)	
+
+		# calculate LODs
 		lodd['Structure LOD'] = np.log2(struct_prob/null(seq[21:], nucleotide_freq))
 		lodd['Upstream LOD'] = np.log2(upstream_prob/null(seq[0:15], nucleotide_freq))
 		lodd['Slippery LOD'] = np.log2(slip_prob/null(seq[15:21], nucleotide_freq))
@@ -179,7 +198,6 @@ def prob_eval(pattern_matches, nucleotide_freq, tildes, stars, structure_marg, s
 		lodd['n'] = n
 		lodd['len vienna region'] = len(seq) - 26
 		null_prob = null(seq, nucleotide_freq)
-		#lodd['subopt_structs'] = subopt_structs
 		lodd['LOD'] = np.log2(total_prob/null_prob)
 		records.append(lodd)
 	df = pd.DataFrame(records)
@@ -196,15 +214,19 @@ def random_LODs(n, fasta, inp):
 		priors = info.replace("'", "\"")
 		priors = json.loads(priors)
 	f.close()
+	# read in parameters
 	freq = priors['freq']
 	structure_marg = priors['Structure params']
 	tildes = priors['tildes']
 	stars = priors['stars']
 	ss = priors['SS_t']
+
+	# generate random sequences if there are no input sequences
 	if inp == None:
 		lengths = generate_lengths(n, fasta)
 		genes = generate_random_genes(lengths, freq)
 		out = "null.tsv"
+	# parse input sequences
 	else:
 		out = f'{inp}.results.tsv'
 		with open(inp) as f:
@@ -217,6 +239,8 @@ def random_LODs(n, fasta, inp):
 			seq = ''.join(gene.split('\n')[1:])
 			gene_name = header.split(' ')[0]
 			genes[gene_name] = seq
+
+	# find slipperys sequencees and calculate LOD
 	pattern_matches = slippery_sequence_search(genes, glength)
 	df = prob_eval(pattern_matches, freq, tildes, stars, structure_marg, ss)
 	df = df.sort_values(by =['LOD'], ascending = False)

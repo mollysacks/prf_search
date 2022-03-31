@@ -4,17 +4,12 @@ import json
 import matplotlib.pyplot as plt
 
 def num_arresting_residues(string):
+	# count number of arresting residues
 	n = 0
 	for c in string:
 		if c == 'P' or c == 'K' or c == 'R':
 			n += 1
 	return n
-
-def colors(val, thresh):
-	if val > thresh:
-		return 'b'
-	else:
-		return 'r'
 
 def reformat_output(output):
 	# Convert report into TSV
@@ -29,10 +24,11 @@ def reformat_output(output):
 			dict_list.append(line_dict)
 	f.close()
 	df = pd.DataFrame(dict_list)
-	first_column = df.pop('cDNA')
+	#move LOD and gene to first and second columns
+	first_column = df.pop('gene')
 	second_column = df.pop('LOD')
 	df.insert(0, 'LOD', second_column)
-	df.insert(0, 'cDNA', first_column)
+	df.insert(0, 'gene', first_column)
 	df = df.sort_values(by =['LOD'], ascending = False)
 
 	df['Arresting Residues'] = df["Arrest Sequence"].apply(num_arresting_residues)

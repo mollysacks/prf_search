@@ -49,6 +49,7 @@ def find_structure(sto):
 	return structure
 
 def structure_info(structure_string):
+	# parse CaCoFold structure
 	# find space and trim string
 	space = 0
 	for c in range(len(structure_string)):
@@ -95,10 +96,12 @@ def generate_output(ref, sto, num_bases, len_SD_region, proline_threshold, repor
 	loc_dict = nascent.copy()
 	for key, value in SD_dict.items():
 		loc_dict[key] = value
+
+	# put data into dictionary
 	loc_dict["Len Vienna region"] = len(reference) - 26
 	loc_dict["Slippery Sequence Start (k)"]	= slippery_loc
 	loc_dict["Slippery Sequence End (l)"]= slippery_loc + 6
-	loc_dict["cDNA"] = loc.split('/')[1]
+	loc_dict["gene"] = loc.split('/')[1]
 	loc_dict["Structure"] = structure_string
 	loc_dict["h"] = slippery_loc - len_SD_region + 1
 	loc_dict["m"] = loc_dict["Slippery Sequence End (l)"] + 6 + space
