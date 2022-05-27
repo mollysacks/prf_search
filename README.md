@@ -42,4 +42,6 @@ To run pipeline on 4000 randomly generated sequences following E. coli gene leng
 
 `python3 random_probability_eval.py -N 4000 -F All-genes-of-E.-coli-K-12-substr.-MG1655.fasta`
 
+To build a database from NCBI refseq
 
+`python3 -I assembly_summary.txt -O bacteria_db.fa
